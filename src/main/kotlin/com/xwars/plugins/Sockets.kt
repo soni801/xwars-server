@@ -23,21 +23,27 @@ fun Application.configureSockets() {
             if (connections.any { it.game == game && it.player == 0 } && connections.none { it.game == game && it.player == 1 })
             {
                 println("Player 1 connected to game $game")
-                val thisConnection = Connection(this, 1, game)
+                val thisConnection = Connection(this, 1, game, false)
                 connections += thisConnection
                 try {
                     send("You are connected!")
                     for (frame in incoming) {
                         frame as?Frame.Text ?: continue
                         val received = frame.readText()
-                        connections.filter { it.game == game && it.player == 0 }.forEach {
-                            it.session.send(received)
+                        if (thisConnection.turn)
+                        {
+                            thisConnection.turn = false
+                            connections.filter { it.game == game && it.player == 0 }.forEach {
+                                it.session.send(received)
+                                it.turn = true
+                            }
                         }
+                        else send("Not your turn")
                     }
                 } catch (e: Exception) {
                     println(e.localizedMessage)
                 } finally {
-                    println("Closed connection for player 1 to $game")
+                    println("Player 1 disconnected from game $game")
                     connections -= thisConnection
                 }
             }
@@ -48,21 +54,28 @@ fun Application.configureSockets() {
                 game = createGameCode()
             } while (connections.any { it.game == game })
             println("New game created: $game")
-            val thisConnection = Connection(this, 0, game)
+            println("Player 0 connected to game $game")
+            val thisConnection = Connection(this, 0, game, true)
             connections += thisConnection
             try {
                 send("You are connected!")
                 for (frame in incoming) {
                     frame as?Frame.Text ?: continue
                     val received = frame.readText()
-                    connections.filter { it.player == 1 && it.game == game }.forEach {
-                        it.session.send(received)
+                    if (thisConnection.turn)
+                    {
+                        thisConnection.turn = false
+                        connections.filter { it.game == game && it.player == 1 }.forEach {
+                            it.session.send(received)
+                            it.turn = true
+                        }
                     }
+                    else send("Not your turn")
                 }
             } catch (e: Exception) {
                 println(e.localizedMessage)
             } finally {
-                println("Closed connection for player 0 to $game")
+                println("Player 0 disconnected from game $game")
                 connections -= thisConnection
             }
         }
