@@ -27,15 +27,15 @@ fun Application.configureSockets() {
                 val thisConnection = Connection(this, 1, game, false)
                 connections += thisConnection
                 try {
-                    send(Gson().toJson(mapOf<Any, Any>("success" to true, "game" to game)))
+                    send(Gson().toJson(mapOf<Any, Any>("type" to "response", "success" to true, "game" to game)))
                     for (frame in incoming) {
                         frame as?Frame.Text ?: continue
                         val received = frame.readText()
                         var `return`: Map<Any, Any>
                         if (thisConnection.turn)
                         {
-                            `return` = mapOf("success" to true)
-                            val send = mapOf<Any, Any>("action" to "chat", "message" to received)
+                            `return` = mapOf("type" to "response", "success" to true)
+                            val send = mapOf<Any, Any>("type" to "remote", "action" to "chat", "message" to received)
 
                             send(Gson().toJson(`return`))
                             thisConnection.turn = false
@@ -47,7 +47,7 @@ fun Application.configureSockets() {
                         }
                         else
                         {
-                            `return` = mapOf("success" to false, "reason" to "Not your turn")
+                            `return` = mapOf("type" to "response", "success" to false, "reason" to "Not your turn")
                             send(Gson().toJson(`return`))
                         }
                     }
@@ -58,6 +58,7 @@ fun Application.configureSockets() {
                     connections -= thisConnection
                 }
             }
+            else send(Gson().toJson(mapOf<Any, Any>("type" to "response", "success" to false, "reason" to "Invalid game code")))
         }
         webSocket("/xwars/new") {
             var game: String
@@ -69,27 +70,35 @@ fun Application.configureSockets() {
             val thisConnection = Connection(this, 0, game, true)
             connections += thisConnection
             try {
-                send(Gson().toJson(mapOf<Any, Any>("success" to true, "game" to game)))
+                send(Gson().toJson(mapOf<Any, Any>("type" to "response", "success" to true, "game" to game)))
                 for (frame in incoming) {
                     frame as?Frame.Text ?: continue
                     val received = frame.readText()
                     var `return`: Map<Any, Any>
                     if (thisConnection.turn)
                     {
-                        `return` = mapOf("success" to true)
-                        val send = mapOf<Any, Any>("action" to "chat", "message" to received)
+                        if (connections.any { it.game == game && it.player == 1 })
+                        {
+                            `return` = mapOf("type" to "response", "success" to true)
+                            val send = mapOf<Any, Any>("type" to "remote", "action" to "chat", "message" to received)
 
-                        send(Gson().toJson(`return`))
-                        thisConnection.turn = false
+                            send(Gson().toJson(`return`))
+                            thisConnection.turn = false
 
-                        connections.filter { it.game == game && it.player == 1 }.forEach {
-                            it.session.send(Gson().toJson(send))
-                            it.turn = true
+                            connections.filter { it.game == game && it.player == 1 }.forEach {
+                                it.session.send(Gson().toJson(send))
+                                it.turn = true
+                            }
+                        }
+                        else
+                        {
+                            `return` = mapOf("type" to "response", "success" to false, "reason" to "No other player")
+                            send(Gson().toJson(`return`))
                         }
                     }
                     else
                     {
-                        `return` = mapOf("success" to false, "reason" to "Not your turn")
+                        `return` = mapOf("type" to "response", "success" to false, "reason" to "Not your turn")
                         send(Gson().toJson(`return`))
                     }
                 }
@@ -97,6 +106,7 @@ fun Application.configureSockets() {
                 println(e.localizedMessage)
             } finally {
                 println("Player 0 disconnected from game $game")
+                println("Game deleted: $game")
                 connections -= thisConnection
             }
         }
