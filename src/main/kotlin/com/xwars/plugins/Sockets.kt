@@ -1,5 +1,6 @@
 package com.xwars.plugins
 
+import com.google.gson.Gson
 import com.xwars.Connection
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -26,19 +27,29 @@ fun Application.configureSockets() {
                 val thisConnection = Connection(this, 1, game, false)
                 connections += thisConnection
                 try {
-                    send("You are connected!")
+                    send(Gson().toJson(mapOf<Any, Any>("success" to true, "game" to game)))
                     for (frame in incoming) {
                         frame as?Frame.Text ?: continue
                         val received = frame.readText()
+                        var `return`: Map<Any, Any>
                         if (thisConnection.turn)
                         {
+                            `return` = mapOf("success" to true)
+                            val send = mapOf<Any, Any>("action" to "chat", "message" to received)
+
+                            send(Gson().toJson(`return`))
                             thisConnection.turn = false
+
                             connections.filter { it.game == game && it.player == 0 }.forEach {
-                                it.session.send(received)
+                                it.session.send(Gson().toJson(send))
                                 it.turn = true
                             }
                         }
-                        else send("Not your turn")
+                        else
+                        {
+                            `return` = mapOf("success" to false, "reason" to "Not your turn")
+                            send(Gson().toJson(`return`))
+                        }
                     }
                 } catch (e: Exception) {
                     println(e.localizedMessage)
@@ -58,19 +69,29 @@ fun Application.configureSockets() {
             val thisConnection = Connection(this, 0, game, true)
             connections += thisConnection
             try {
-                send("You are connected!")
+                send(Gson().toJson(mapOf<Any, Any>("success" to true, "game" to game)))
                 for (frame in incoming) {
                     frame as?Frame.Text ?: continue
                     val received = frame.readText()
+                    var `return`: Map<Any, Any>
                     if (thisConnection.turn)
                     {
+                        `return` = mapOf("success" to true)
+                        val send = mapOf<Any, Any>("action" to "chat", "message" to received)
+
+                        send(Gson().toJson(`return`))
                         thisConnection.turn = false
+
                         connections.filter { it.game == game && it.player == 1 }.forEach {
-                            it.session.send(received)
+                            it.session.send(Gson().toJson(send))
                             it.turn = true
                         }
                     }
-                    else send("Not your turn")
+                    else
+                    {
+                        `return` = mapOf("success" to false, "reason" to "Not your turn")
+                        send(Gson().toJson(`return`))
+                    }
                 }
             } catch (e: Exception) {
                 println(e.localizedMessage)
