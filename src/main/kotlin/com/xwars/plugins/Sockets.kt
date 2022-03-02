@@ -33,32 +33,38 @@ fun Application.configureSockets() {
                     }
                     for (frame in incoming) {
                         frame as?Frame.Text ?: continue
-                        val received = frame.readText()
+                        val received = Gson().fromJson(frame.readText(), Map::class.java)
                         var `return`: Map<Any, Any>
-                        if (thisConnection.turn)
+                        if (connections.any { it.game == game && it.player == 0 })
                         {
-                            if (connections.any { it.game == game && it.player == 0 })
+                            if (received["action"] == "turn")
                             {
-                                `return` = mapOf("type" to "response", "success" to true)
-                                val send = mapOf<Any, Any>("type" to "remote", "action" to "chat", "message" to received)
-
-                                send(Gson().toJson(`return`))
-                                thisConnection.turn = false
-
-                                connections.filter { it.game == game && it.player == 0 }.forEach {
-                                    it.session.send(Gson().toJson(send))
-                                    it.turn = true
+                                if (thisConnection.turn)
+                                {
+                                    thisConnection.turn = false
+                                    connections.filter { it.game == game && it.player == 0 }.forEach {
+                                        it.turn = true
+                                    }
+                                }
+                                else
+                                {
+                                    `return` = mapOf("type" to "response", "success" to false, "reason" to "Not your turn")
+                                    send(Gson().toJson(`return`))
+                                    continue
                                 }
                             }
-                            else
-                            {
-                                `return` = mapOf("type" to "response", "success" to false, "reason" to "No other player")
-                                send(Gson().toJson(`return`))
+
+                            `return` = mapOf("type" to "response", "success" to true)
+                            val send = mapOf("type" to "remote") + received
+
+                            send(Gson().toJson(`return`))
+                            connections.filter { it.game == game && it.player == 0 }.forEach {
+                                it.session.send(Gson().toJson(send))
                             }
                         }
                         else
                         {
-                            `return` = mapOf("type" to "response", "success" to false, "reason" to "Not your turn")
+                            `return` = mapOf("type" to "response", "success" to false, "reason" to "No other player")
                             send(Gson().toJson(`return`))
                         }
                     }
@@ -87,32 +93,38 @@ fun Application.configureSockets() {
                 send(Gson().toJson(mapOf<Any, Any>("type" to "response", "success" to true, "game" to game)))
                 for (frame in incoming) {
                     frame as?Frame.Text ?: continue
-                    val received = frame.readText()
+                    val received = Gson().fromJson(frame.readText(), Map::class.java)
                     var `return`: Map<Any, Any>
-                    if (thisConnection.turn)
+                    if (connections.any { it.game == game && it.player == 1 })
                     {
-                        if (connections.any { it.game == game && it.player == 1 })
+                        if (received["action"] == "turn")
                         {
-                            `return` = mapOf("type" to "response", "success" to true)
-                            val send = mapOf<Any, Any>("type" to "remote", "action" to "chat", "message" to received)
-
-                            send(Gson().toJson(`return`))
-                            thisConnection.turn = false
-
-                            connections.filter { it.game == game && it.player == 1 }.forEach {
-                                it.session.send(Gson().toJson(send))
-                                it.turn = true
+                            if (thisConnection.turn)
+                            {
+                                thisConnection.turn = false
+                                connections.filter { it.game == game && it.player == 1 }.forEach {
+                                    it.turn = true
+                                }
+                            }
+                            else
+                            {
+                                `return` = mapOf("type" to "response", "success" to false, "reason" to "Not your turn")
+                                send(Gson().toJson(`return`))
+                                continue
                             }
                         }
-                        else
-                        {
-                            `return` = mapOf("type" to "response", "success" to false, "reason" to "No other player")
-                            send(Gson().toJson(`return`))
+
+                        `return` = mapOf("type" to "response", "success" to true)
+                        val send = mapOf("type" to "remote") + received
+
+                        send(Gson().toJson(`return`))
+                        connections.filter { it.game == game && it.player == 1 }.forEach {
+                            it.session.send(Gson().toJson(send))
                         }
                     }
                     else
                     {
-                        `return` = mapOf("type" to "response", "success" to false, "reason" to "Not your turn")
+                        `return` = mapOf("type" to "response", "success" to false, "reason" to "No other player")
                         send(Gson().toJson(`return`))
                     }
                 }
