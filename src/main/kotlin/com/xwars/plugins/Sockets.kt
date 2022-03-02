@@ -28,21 +28,32 @@ fun Application.configureSockets() {
                 connections += thisConnection
                 try {
                     send(Gson().toJson(mapOf<Any, Any>("type" to "response", "success" to true, "game" to game)))
+                    connections.filter { it.game == game && it.player == 0 }.forEach {
+                        it.session.send(Gson().toJson(mapOf("type" to "remote", "action" to "join")))
+                    }
                     for (frame in incoming) {
                         frame as?Frame.Text ?: continue
                         val received = frame.readText()
                         var `return`: Map<Any, Any>
                         if (thisConnection.turn)
                         {
-                            `return` = mapOf("type" to "response", "success" to true)
-                            val send = mapOf<Any, Any>("type" to "remote", "action" to "chat", "message" to received)
+                            if (connections.any { it.game == game && it.player == 0 })
+                            {
+                                `return` = mapOf("type" to "response", "success" to true)
+                                val send = mapOf<Any, Any>("type" to "remote", "action" to "chat", "message" to received)
 
-                            send(Gson().toJson(`return`))
-                            thisConnection.turn = false
+                                send(Gson().toJson(`return`))
+                                thisConnection.turn = false
 
-                            connections.filter { it.game == game && it.player == 0 }.forEach {
-                                it.session.send(Gson().toJson(send))
-                                it.turn = true
+                                connections.filter { it.game == game && it.player == 0 }.forEach {
+                                    it.session.send(Gson().toJson(send))
+                                    it.turn = true
+                                }
+                            }
+                            else
+                            {
+                                `return` = mapOf("type" to "response", "success" to false, "reason" to "No other player")
+                                send(Gson().toJson(`return`))
                             }
                         }
                         else
@@ -54,6 +65,9 @@ fun Application.configureSockets() {
                 } catch (e: Exception) {
                     println(e.localizedMessage)
                 } finally {
+                    connections.filter { it.game == game && it.player == 0 }.forEach {
+                        it.session.send(Gson().toJson(mapOf("type" to "remote", "action" to "leave")))
+                    }
                     println("Player 1 disconnected from game $game")
                     connections -= thisConnection
                 }
@@ -105,6 +119,9 @@ fun Application.configureSockets() {
             } catch (e: Exception) {
                 println(e.localizedMessage)
             } finally {
+                connections.filter { it.game == game && it.player == 1 }.forEach {
+                    it.session.send(Gson().toJson(mapOf("type" to "remote", "action" to "leave")))
+                }
                 println("Player 0 disconnected from game $game")
                 println("Game deleted: $game")
                 connections -= thisConnection
